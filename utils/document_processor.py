@@ -32,26 +32,36 @@ def extract_resume_text(pdf_file):
         raise ValueError("Uploaded PDF is empty.")
 
     try:
+        print("PDF STEP 1: Reading PDF...")
+
         reader = PdfReader(BytesIO(pdf_bytes))
 
         if reader.is_encrypted:
             raise ValueError("Encrypted PDF is not supported.")
 
-        if len(reader.pages) == 0:
+        total_pages = len(reader.pages)
+
+        if total_pages == 0:
             raise ValueError("PDF has no pages.")
 
-        # First try normal PDF text extraction.
-        pages = [
-            page.extract_text() or ""
-            for page in reader.pages
-        ]
+        print(f"PDF STEP 2: Total pages: {total_pages}")
+
+        # First try normal text extraction.
+        pages = []
+
+        for i, page in enumerate(reader.pages, start=1):
+            print(f"PDF STEP 3: Extracting page {i}/{total_pages}")
+            pages.append(page.extract_text() or "")
 
         text = "\n\n".join(pages).strip()
 
         if text:
+            print("PDF STEP 4: Normal text extraction successful")
+            print("Extracted characters:", len(text))
             return text
 
-        # If the PDF is scanned, use OCR.
+        print("PDF STEP 4: No selectable text. Starting OCR...")
+
         return extract_using_ocr(pdf_bytes)
 
     except ValueError:
@@ -64,31 +74,26 @@ def extract_resume_text(pdf_file):
 
 
 def extract_using_ocr(pdf_bytes):
-    """Extract text from scanned PDFs using Tesseract OCR."""
+    """OCR fallback for scanned PDF files."""
 
     try:
         import pytesseract
         from pdf2image import convert_from_bytes
 
-        # Configure Tesseract.
+        print("OCR STEP 1: Checking Tesseract...")
+
         if os.name == "nt":
             if Path(TESSERACT_PATH).is_file():
                 pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
             elif not shutil.which("tesseract"):
-                raise RuntimeError(
-                    "Tesseract executable not found on Windows."
-                )
+                raise RuntimeError("Tesseract executable not found.")
         else:
             if not shutil.which("tesseract"):
-                raise RuntimeError(
-                    "Tesseract executable not found on Linux."
-                )
+                raise RuntimeError("Tesseract executable not found on Linux.")
 
-        # Validate Poppler only on Windows.
+        print("OCR STEP 2: Tesseract available")
+
         if os.name == "nt":
-            if not POPPLER_PATH:
-                raise RuntimeError("Poppler path is not configured.")
-
             poppler_dir = Path(POPPLER_PATH)
 
             if not (poppler_dir / "pdftoppm.exe").is_file():
@@ -96,30 +101,37 @@ def extract_using_ocr(pdf_bytes):
                     f"Poppler path incorrect: {POPPLER_PATH}"
                 )
 
-            if not (poppler_dir / "pdfinfo.exe").is_file():
-                raise RuntimeError(
-                    "pdfinfo.exe missing from Poppler bin."
-                )
+        print("OCR STEP 3: Converting PDF pages to images...")
 
-        # Convert PDF bytes into images.
         images = convert_from_bytes(
             pdf_bytes,
-            poppler_path=POPPLER_PATH
+            dpi=150,
+            poppler_path=POPPLER_PATH,
+            thread_count=2,
+            timeout=60
         )
+
+        print(f"OCR STEP 4: Converted {len(images)} pages")
 
         extracted = []
 
-        for image in images:
+        for i, image in enumerate(images, start=1):
+            print(f"OCR STEP 5: Reading page {i}/{len(images)}")
+
             text = pytesseract.image_to_string(
                 image,
-                lang="eng"
+                lang="eng",
+                timeout=30
             )
+
             extracted.append(text)
 
         result = "\n\n".join(extracted).strip()
 
         if not result:
             raise ValueError("OCR found no readable text.")
+
+        print("OCR STEP 6: OCR completed successfully")
 
         return result
 
@@ -129,7 +141,6 @@ def extract_using_ocr(pdf_bytes):
         raise ValueError(
             f"OCR failed: {type(exc).__name__}: {exc}"
         ) from exc
-
 
 def validate_job_description(jd_text):
     """Validate job description text."""
