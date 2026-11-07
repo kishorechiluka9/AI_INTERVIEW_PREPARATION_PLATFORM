@@ -83,51 +83,84 @@ def extract_resume_text(pdf_file):
 
     return extract_using_ocr(pdf_bytes)
 
+
 def extract_using_ocr(pdf_bytes):
     try:
+        import fitz
         import pytesseract
-        from pdf2image import convert_from_bytes
+        from PIL import Image
 
-        if os.name == "nt":
-            if Path(TESSERACT_PATH).is_file():
-                pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
-            elif not shutil.which("tesseract"):
-                raise RuntimeError("Tesseract executable not found.")
+        # Find Tesseract executable on Streamlit Cloud
+        tesseract_path = shutil.which("tesseract")
 
-            poppler_path = POPPLER_PATH
-        else:
-            if not shutil.which("tesseract"):
-                raise RuntimeError("Tesseract executable not found on Linux.")
+        if not tesseract_path:
+            raise RuntimeError(
+                "Tesseract executable not found. Check packages.txt."
+            )
 
-            poppler_path = None
+        pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
-        images = convert_from_bytes(
-            pdf_bytes,
-            dpi=150,
-            first_page=1,
-            last_page=2,
-            poppler_path=poppler_path
+        print("OCR STEP 1: Opening PDF with PyMuPDF", flush=True)
+
+        document = fitz.open(
+            stream=pdf_bytes,
+            filetype="pdf"
         )
 
         extracted = []
 
-        for image in images:
+        for page_number, page in enumerate(document, start=1):
+
+            print(
+                f"OCR STEP 2: Rendering page {page_number}",
+                flush=True
+            )
+
+            pix = page.get_pixmap(
+                matrix=fitz.Matrix(2, 2),
+                colorspace=fitz.csGRAY,
+                alpha=False
+            )
+
+            image = Image.frombytes(
+                "L",
+                [pix.width, pix.height],
+                pix.samples
+            )
+
+            print(
+                f"OCR STEP 3: Image size {image.size}",
+                flush=True
+            )
+
             text = pytesseract.image_to_string(
                 image,
                 lang="eng",
-                timeout=30
+                config="--oem 1 --psm 6",
+                timeout=90
             )
+
+            print(
+                f"OCR STEP 4: Page {page_number}, characters: {len(text)}",
+                flush=True
+            )
+
             extracted.append(text)
+
+        document.close()
 
         result = "\n\n".join(extracted).strip()
 
-        if not result:
-            raise ValueError("OCR found no readable text.")
+        if len(result) < 20:
+            raise ValueError(
+                "OCR could not extract readable resume text."
+            )
 
         return result
 
     except Exception as exc:
         print("OCR ERROR:", repr(exc), flush=True)
+
         raise ValueError(
             f"OCR failed: {type(exc).__name__}: {exc}"
         ) from exc

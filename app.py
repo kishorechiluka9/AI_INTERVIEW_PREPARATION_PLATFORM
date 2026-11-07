@@ -256,7 +256,7 @@ else:
 if "vector_store" in st.session_state:
 
     st.divider()
-    st.header("🔎 Step 3: Resume Semantic Search")
+    st.header("Resume Semantic Search")
 
     search_query = st.text_input(
         "Ask something about your resume",

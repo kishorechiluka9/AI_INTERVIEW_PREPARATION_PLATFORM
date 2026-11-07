@@ -1,4 +1,4 @@
-pytesseract
-pdf2image
-pypdf
 pymupdf
+pypdf
+pytesseract
+Pillow
