@@ -58,7 +58,7 @@ st.divider()
 
 # ---------------- RESUME UPLOAD ----------------
 
-st.header("📄 Step 1: Upload Your Resume")
+st.header(" Upload Your Resume")
 
 resume_file = st.file_uploader(
     "Upload your Resume (PDF only)",
@@ -75,7 +75,7 @@ if resume_file is not None:
 
 # ---------------- JOB DESCRIPTION ----------------
 
-st.header("💼 Step 2: Job Description")
+st.header("Job Description")
 
 jd_text = st.text_area(
     "Paste the Job Description here",
@@ -115,12 +115,25 @@ if analyze:
             clean_jd = validate_job_description(jd_text)
 
             # Process resume
-            with st.spinner(
-                "Processing resume and Job Description..."
-            ):
-                resume_text = extract_resume_text(
-                    resume_file
-                )
+            import time
+
+            with st.spinner("Extracting resume text..."):
+
+                start = time.time()
+
+            st.write("DEBUG 1: PDF extraction started")
+
+            resume_text = extract_resume_text(resume_file)
+
+            st.write("DEBUG 2: PDF extraction completed")
+
+            st.write("Characters:", len(resume_text))
+
+            st.write(
+                "Time:",
+                round(time.time() - start, 2),
+                "seconds"
+            )
 
             # Store results in session
             st.session_state["resume_text"] = resume_text
@@ -196,7 +209,7 @@ if (
 
     # Resume preview
     with st.expander(
-        "📄 View Extracted Resume Text",
+        "View Extracted Resume Text",
         expanded=True,
     ):
         st.text_area(
@@ -213,7 +226,7 @@ if (
             )
 
     # JD preview
-    with st.expander("💼 View Job Description"):
+    with st.expander("View Job Description"):
         st.text_area(
             "Job Description Preview",
             value=clean_jd,
@@ -276,7 +289,7 @@ if "vector_store" in st.session_state:
 # ---------------- STEP 4: INTERVIEW QUESTIONS ----------------
 
 st.divider()
-st.header("🎯 Step 4: Interview Question Generator")
+st.header("Interview Question Generator")
 
 if (
     "vector_store" in st.session_state
@@ -327,7 +340,7 @@ else:
 # ---------------- STEP 5: MOCK INTERVIEW ----------------
 
 st.divider()
-st.header("🎤 Step 5: Mock Interview")
+st.header("Mock Interview")
 
 if "interview_questions" in st.session_state:
 
