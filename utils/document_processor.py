@@ -15,7 +15,6 @@ POPPLER_PATH = (
 
 TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-
 def extract_resume_text(pdf_file):
     if pdf_file is None:
         raise ValueError("Please upload your resume PDF.")
@@ -26,6 +25,7 @@ def extract_resume_text(pdf_file):
         raise ValueError("Uploaded PDF is empty.")
 
     # STEP 1: Try extracting text using pypdf
+    print("NEW DOCUMENT PROCESSOR CODE RUNNING", flush=True)
     try:
         reader = PdfReader(BytesIO(pdf_bytes))
 
@@ -53,6 +53,7 @@ def extract_resume_text(pdf_file):
         print("pypdf extraction error:", repr(exc), flush=True)
 
     # STEP 2: Try PyMuPDF as an alternative
+    print("TRYING PYMUPDF EXTRACTION", flush=True)
     try:
         import fitz
 
@@ -81,7 +82,6 @@ def extract_resume_text(pdf_file):
     print("No readable text found. Starting OCR...", flush=True)
 
     return extract_using_ocr(pdf_bytes)
-
 
 def extract_using_ocr(pdf_bytes):
     try:
