@@ -1,15 +1,24 @@
 
 from io import BytesIO
 from pathlib import Path
+import os
 import shutil
 
 from pypdf import PdfReader
-import os
 
-if os.name == "nt":
-    poppler_path = r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
-else:
-    poppler_path = None
+
+# Windows Poppler path; Streamlit Cloud uses Linux system Poppler.
+POPPLER_PATH = (
+    r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
+    if os.name == "nt"
+    else None
+)
+
+# Windows Tesseract path.
+TESSERACT_PATH = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
+
 
 def extract_resume_text(pdf_file):
     """Extract resume text from normal or scanned PDFs."""
@@ -31,7 +40,7 @@ def extract_resume_text(pdf_file):
         if len(reader.pages) == 0:
             raise ValueError("PDF has no pages.")
 
-        # First try normal PDF extraction
+        # First try normal PDF text extraction.
         pages = [
             page.extract_text() or ""
             for page in reader.pages
@@ -42,7 +51,7 @@ def extract_resume_text(pdf_file):
         if text:
             return text
 
-        # If no readable text, try OCR
+        # If the PDF is scanned, use OCR.
         return extract_using_ocr(pdf_bytes)
 
     except ValueError:
@@ -55,67 +64,62 @@ def extract_resume_text(pdf_file):
 
 
 def extract_using_ocr(pdf_bytes):
-    """OCR fallback for scanned PDF files."""
+    """Extract text from scanned PDFs using Tesseract OCR."""
 
     try:
         import pytesseract
         from pdf2image import convert_from_bytes
 
-        # Tesseract executable path
-        tess_path = (
-            r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        # Configure Tesseract.
+        if os.name == "nt":
+            if Path(TESSERACT_PATH).is_file():
+                pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+            elif not shutil.which("tesseract"):
+                raise RuntimeError(
+                    "Tesseract executable not found on Windows."
+                )
+        else:
+            if not shutil.which("tesseract"):
+                raise RuntimeError(
+                    "Tesseract executable not found on Linux."
+                )
+
+        # Validate Poppler only on Windows.
+        if os.name == "nt":
+            if not POPPLER_PATH:
+                raise RuntimeError("Poppler path is not configured.")
+
+            poppler_dir = Path(POPPLER_PATH)
+
+            if not (poppler_dir / "pdftoppm.exe").is_file():
+                raise RuntimeError(
+                    f"Poppler path incorrect: {POPPLER_PATH}"
+                )
+
+            if not (poppler_dir / "pdfinfo.exe").is_file():
+                raise RuntimeError(
+                    "pdfinfo.exe missing from Poppler bin."
+                )
+
+        # Convert PDF bytes into images.
+        images = convert_from_bytes(
+            pdf_bytes,
+            poppler_path=POPPLER_PATH
         )
-
-        if Path(tess_path).is_file():
-            pytesseract.pytesseract.tesseract_cmd = tess_path
-        elif not shutil.which("tesseract"):
-            raise RuntimeError(
-                "Tesseract executable not found."
-            )
-
-        # Replace with your verified Poppler bin path
-            import os
-            from pdf2image import convert_from_path
-
-            if os.name == "nt":
-                POPPLER_PATH = r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
-            else:
-                POPPLER_PATH = None
-
-        if not (
-            Path(poppler_path) / "pdftoppm.exe"
-        ).is_file():
-            raise RuntimeError(
-                f"Poppler path incorrect: {poppler_path}"
-            )
-
-        if not (
-            Path(poppler_path) / "pdfinfo.exe"
-        ).is_file():
-            raise RuntimeError(
-                "pdfinfo.exe missing from Poppler bin."
-            )
-
-            images = convert_from_path(
-                pdf_path,
-                poppler_path=poppler_path
-            )
 
         extracted = []
 
         for image in images:
             text = pytesseract.image_to_string(
                 image,
-                lang="eng",
+                lang="eng"
             )
             extracted.append(text)
 
         result = "\n\n".join(extracted).strip()
 
         if not result:
-            raise ValueError(
-                "OCR found no readable text."
-            )
+            raise ValueError("OCR found no readable text.")
 
         return result
 
@@ -131,9 +135,7 @@ def validate_job_description(jd_text):
     """Validate job description text."""
 
     if not jd_text or not jd_text.strip():
-        raise ValueError(
-            "Please enter a Job Description."
-        )
+        raise ValueError("Please enter a Job Description.")
 
     jd_text = jd_text.strip()
 
