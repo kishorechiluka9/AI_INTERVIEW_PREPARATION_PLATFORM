@@ -69,9 +69,13 @@ def extract_using_ocr(pdf_bytes):
             )
 
         # Replace with your verified Poppler bin path
-        poppler_path = (
-            r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
-        )
+            import os
+            from pdf2image import convert_from_path
+
+            if os.name == "nt":
+                POPPLER_PATH = r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
+            else:
+                POPPLER_PATH = None
 
         if not (
             Path(poppler_path) / "pdftoppm.exe"
