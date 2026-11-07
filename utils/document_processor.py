@@ -7,14 +7,6 @@ from pathlib import Path
 from pypdf import PdfReader
 
 
-POPPLER_PATH = (
-    r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
-    if os.name == "nt"
-    else None
-)
-
-TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
 def extract_resume_text(pdf_file):
     if pdf_file is None:
         raise ValueError("Please upload your resume PDF.")
@@ -24,8 +16,9 @@ def extract_resume_text(pdf_file):
     if not pdf_bytes:
         raise ValueError("Uploaded PDF is empty.")
 
-    # STEP 1: Try extracting text using pypdf
-    print("NEW DOCUMENT PROCESSOR CODE RUNNING", flush=True)
+    print("PDF PROCESSING STARTED", flush=True)
+
+    # STEP 1: Extract normal PDF text using pypdf
     try:
         reader = PdfReader(BytesIO(pdf_bytes))
 
@@ -42,18 +35,18 @@ def extract_resume_text(pdf_file):
 
         text = "\n\n".join(pages).strip()
 
-        print("pypdf extracted characters:", len(text), flush=True)
+        print("PYPDF CHARACTERS:", len(text), flush=True)
 
         if len(text) > 20:
+            print("TEXT PDF SUCCESS", flush=True)
             return text
 
     except ValueError:
         raise
     except Exception as exc:
-        print("pypdf extraction error:", repr(exc), flush=True)
+        print("PYPDF ERROR:", repr(exc), flush=True)
 
-    # STEP 2: Try PyMuPDF as an alternative
-    print("TRYING PYMUPDF EXTRACTION", flush=True)
+    # STEP 2: Try PyMuPDF text extraction
     try:
         import fitz
 
@@ -70,16 +63,17 @@ def extract_resume_text(pdf_file):
         text = "\n\n".join(pages).strip()
         document.close()
 
-        print("PyMuPDF extracted characters:", len(text), flush=True)
+        print("PYMUPDF CHARACTERS:", len(text), flush=True)
 
         if len(text) > 20:
+            print("PYMUPDF TEXT SUCCESS", flush=True)
             return text
 
     except Exception as exc:
-        print("PyMuPDF extraction error:", repr(exc), flush=True)
+        print("PYMUPDF ERROR:", repr(exc), flush=True)
 
-    # STEP 3: Use OCR only if text extraction fails
-    print("No readable text found. Starting OCR...", flush=True)
+    # STEP 3: OCR fallback for scanned/image PDFs
+    print("STARTING OCR FALLBACK", flush=True)
 
     return extract_using_ocr(pdf_bytes)
 
@@ -88,19 +82,26 @@ def extract_using_ocr(pdf_bytes):
     try:
         import fitz
         import pytesseract
-        from PIL import Image
 
-        # Find Tesseract executable on Streamlit Cloud
+        from PIL import Image, ImageOps
+
+        # Find Tesseract
         tesseract_path = shutil.which("tesseract")
+
+        if not tesseract_path and os.name == "nt":
+            windows_path = (
+                r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+            )
+
+            if Path(windows_path).is_file():
+                tesseract_path = windows_path
 
         if not tesseract_path:
             raise RuntimeError(
-                "Tesseract executable not found. Check packages.txt."
+                "Tesseract not found. Check packages.txt."
             )
 
         pytesseract.pytesseract.tesseract_cmd = tesseract_path
-
-        print("OCR STEP 1: Opening PDF with PyMuPDF", flush=True)
 
         document = fitz.open(
             stream=pdf_bytes,
@@ -109,39 +110,43 @@ def extract_using_ocr(pdf_bytes):
 
         extracted = []
 
-        for page_number, page in enumerate(document, start=1):
+        for index, page in enumerate(document):
 
             print(
-                f"OCR STEP 2: Rendering page {page_number}",
+                f"OCR PROCESSING PAGE {index + 1}",
                 flush=True
             )
 
+            # Render at 1.5x to reduce processing time
             pix = page.get_pixmap(
-                matrix=fitz.Matrix(2, 2),
+                matrix=fitz.Matrix(1.5, 1.5),
                 colorspace=fitz.csGRAY,
                 alpha=False
             )
 
             image = Image.frombytes(
                 "L",
-                [pix.width, pix.height],
+                (pix.width, pix.height),
                 pix.samples
             )
 
+            # Improve contrast
+            image = ImageOps.autocontrast(image)
+
             print(
-                f"OCR STEP 3: Image size {image.size}",
+                f"OCR IMAGE SIZE: {image.size}",
                 flush=True
             )
 
             text = pytesseract.image_to_string(
                 image,
                 lang="eng",
-                config="--oem 1 --psm 6",
+                config="--oem 1 --psm 3",
                 timeout=90
             )
 
             print(
-                f"OCR STEP 4: Page {page_number}, characters: {len(text)}",
+                f"OCR PAGE {index + 1} CHARACTERS: {len(text)}",
                 flush=True
             )
 
@@ -155,6 +160,8 @@ def extract_using_ocr(pdf_bytes):
             raise ValueError(
                 "OCR could not extract readable resume text."
             )
+
+        print("OCR EXTRACTION SUCCESS", flush=True)
 
         return result
 
