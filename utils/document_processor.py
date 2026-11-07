@@ -4,7 +4,12 @@ from pathlib import Path
 import shutil
 
 from pypdf import PdfReader
+import os
 
+if os.name == "nt":
+    poppler_path = r"C:\Users\user\Downloads\Release-26.09.0-0\poppler-26.09.0\Library\bin"
+else:
+    poppler_path = None
 
 def extract_resume_text(pdf_file):
     """Extract resume text from normal or scanned PDFs."""
@@ -91,14 +96,10 @@ def extract_using_ocr(pdf_bytes):
                 "pdfinfo.exe missing from Poppler bin."
             )
 
-        images = convert_from_bytes(
-            pdf_bytes,
-            dpi=200,
-            poppler_path=poppler_path,
-            first_page=1,
-            last_page=10,
-            thread_count=1,
-        )
+            images = convert_from_path(
+                pdf_path,
+                poppler_path=poppler_path
+            )
 
         extracted = []
 
