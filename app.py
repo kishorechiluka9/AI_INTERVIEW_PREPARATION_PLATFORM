@@ -1,5 +1,11 @@
+import os
 import re
 import streamlit as st
+
+for key in ["GROQ_API_KEY", "GOOGLE_API_KEY"]:
+    if key in st.secrets:
+        os.environ[key] = st.secrets[key]
+
 from utils.rag import analyze_resume_fit
 from utils.chunking import split_resume_into_chunks
 from utils.embeddings import get_embedding_model
@@ -24,6 +30,7 @@ from utils.document_processor import (
     extract_resume_text,
     validate_job_description,
 )
+
 
 # ---------------- PAGE CONFIG ----------------
 
